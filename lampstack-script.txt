@@ -1,0 +1,104 @@
+#!/bin/bash
+#This script will install latest wordpress, Apache, Mariadb and PhP7.4
+# Created By: Salman A. Francis Version:1
+# This Script can be edited and distributed without an permission.
+#Disabling SELinux
+SELinuxConfig=/etc/selinux/config
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' $SELinuxConfig
+setenforce 0
+#variable for conf.d directory
+conf=/etc/httpd/conf.d/
+# Installing important Packages
+yum -y install epel-release
+yum -y install https://rpms.remirepo.net/enterprise/remi-release-7.rpm
+yum -y update
+yum -y install httpd
+systemctl enable httpd
+systemctl start httpd
+yum -y install wget vim unzip curl mod_ssl
+wget https://wordpress.org/latest.zip
+unzip latest.zip
+mv wordpress /var/www/html
+chmod 775 -R /var/www/html/
+chown -R apache:apache /var/www/html/
+# Installing php 7.4
+yum -y install yum-utils
+yum-config-manager --enable remi-php74
+yum -y update
+yum -y install php php-cli php-common php-mysql php-mbstring php php-gd php-intl php-pecl-apcu php-opcache php-json php-pecl-zip php-pear php-pecl-imagick php-fpm php-pecl-redis5 php-pgsql php-common php-pdo php-xml php-lz4 php-pecl-crypto php-pecl-rar php-pecl-pq php-pecl-lzf php-cli php-pecl-apcu-bc mod_php
+# Setting up Firewall Rules
+yum -y install firewalld
+systemctl restart firewalld  && systemctl enable firewalld
+systemctl mask iptables
+firewall-cmd --add-port=25/tcp --permanent
+firewall-cmd --add-port=110/tcp --permanent
+firewall-cmd --add-port=465/tcp --permanent
+firewall-cmd --add-port=143/tcp --permanent
+firewall-cmd --add-port=995/tcp --permanent
+firewall-cmd --add-port=993/tcp --permanent
+firewall-cmd --add-port=80/tcp --permanent
+firewall-cmd --add-port=443/tcp --permanent
+firewall-cmd --add-port=587/tcp --permanent
+firewall-cmd --reload
+
+# Setting up Wordpress and Virtual Hosting
+echo "Please Enter The Name Of Your Domain e.g tekco.net, itpings.com "
+read domainname
+echo "You entered $domainname " is this correct ? Y/N 
+read options
+if [[ $options =~ ^[yY]$ ]]; then
+# Setting up Virtual host for let's Encrypt
+echo "<Virtualhost *:80>
+ServerName $domainname
+DocumentRoot "/var/www/html/wordpress"
+</Virtualhost>" >> $conf/wordpress.conf
+#Installing Let's Encrypt
+systemctl stop httpd
+yum -y install snapd
+systemctl enable snapd
+systemctl restart snapd
+snap install core
+sleep 3
+ln -s /var/lib/snapd/snap /snap
+ln -s /snap/bin/certbot /usr/bin/certbot
+snap refresh core
+sleep 3
+snap install --classic certbot
+certbot --apache
+systemctl start httpd
+snap install core
+systemctl restart snapd
+else
+echo "Please Restart the Script"
+exit 1
+fi
+# Installing Mariadb
+#!/bin/bash
+touch /etc/yum.repos.d/MariaDB.repo
+echo "[mariadb]
+name = MariaDB
+baseurl = http://yum.mariadb.org/10.1/centos7-amd64
+gpgkey=https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
+gpgcheck=1" >> /etc/yum.repos.d/MariaDB.repo
+yum install MariaDB-server MariaDB-client -y
+systemctl start mariadb
+systemctl enable mariadb
+systemctl status mariadb
+mysql_secure_installation
+echo " Please Enter the Mysql root password"
+read rootpass
+mysql -uroot -p$rootpass -e "CREATE DATABASE wordpress;"
+mysql -uroot -p$rootpass -e "CREATE USER itpings@localhost IDENTIFIED BY 'itpings.com_2021';"
+mysql -uroot -p$rootpass -e "GRANT ALL PRIVILEGES ON wordpress.* TO itpings@localhost IDENTIFIED BY 'itpings.com_2021';"
+mysql -uroot -p$rootpass -e "FLUSH PRIVILEGES;"
+systemctl restart mariadb
+systemctl restart httpd
+echo " Please open the Browser and Type: https://$domainname
+Your Database Name is wordpress
+Your Database User is itpings.com
+Your Password is itpings.com_2021
+**********************************
+
+You can change these credentials in the script
+
+********************************** "
