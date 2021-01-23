@@ -95,7 +95,7 @@ systemctl restart mariadb
 systemctl restart httpd
 echo " Please open the Browser and Type: https://$domainname
 Your Database Name is wordpress
-Your Database User is itpings.com
+Your Database User is itpings
 Your Password is itpings.com_2021
 **********************************
 
